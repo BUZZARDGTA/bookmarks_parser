@@ -154,9 +154,9 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
         if html_hr:
             item = "HR"
         elif html_folder:
-            item = "FOLDER"
+            item = "FOLDER" if not args.folders_path else "PATH"
         elif html_link:
-            item = "PATH" if args.folders_path else "LINK"
+            item = "LINK"
         else:
             assert False, "All possible items exhausted"
 

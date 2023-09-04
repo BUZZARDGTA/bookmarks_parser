@@ -188,6 +188,6 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
 
 
 if args.json and result_list:
-        import json
+    import json
 
-        json.dump(result_list, sys.stdout)
+    json.dump(result_list, sys.stdout)

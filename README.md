@@ -1,5 +1,5 @@
 ```
-usage: bookmarks_parser.py [-h] [-folders] [-links] [-hr] [-r] [-i] [-e] [--folders-name | --folders-path]
+usage: bookmarks_parser.py [-h] [-folders] [-links] [-hr] [-r] [-i] [-e] [-j] [--folders-name | --folders-path]
                            [--folders-case_sensitive <folder name> | --folders-case_insensitive <folder name> | --folders-all-case_sensitive <folder name> | --folders-all-case_insensitive <folder name>]
                            [--depth <depth>] [--spacing-style <character>] [--quoting-style <character>]
                            <bookmarks file>
@@ -19,6 +19,7 @@ options:
   -i, --list-index      list the index numbers
   -e, --extended-parsing
                         alternative display easily manipulable for developers
+  -j, --json            output in JSON format
   --folders-name        display the folders name (default)
   --folders-path        display the folders path
   --folders-case_sensitive <folder name>

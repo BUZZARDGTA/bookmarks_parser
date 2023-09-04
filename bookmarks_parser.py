@@ -1,7 +1,6 @@
 import argparse
-import sys
 import re
-
+import sys
 
 parser = argparse.ArgumentParser(description='Parse a HTML bookmark file.')
 
@@ -49,7 +48,7 @@ if not (args.list_folders or args.list_links or args.list_hr):
     args.list_folders = True
     args.list_links = True
     args.list_hr = True
-if not args.depth == False:
+if args.depth is not False:
     args.depth = int(args.depth)
 SPACING_STYLE = args.spacing_style
 if not SPACING_STYLE in [' ', ",", "-", "_"]:
@@ -85,7 +84,6 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
     else:
         previous_line_open_dl_p = False
     for html_open_dl_p, html_hr, html_folder, html_link, html_closed_dl_p in combinedRegex.findall(line):
-
         if html_closed_dl_p:
             if previous_line_open_dl_p:
                 list_path = list_path[:-1]
@@ -157,10 +155,10 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
             item = "HR"
         elif html_folder:
             item = "FOLDER"
-        elif html_link:
-            item = "LINK"
         elif args.folders_path:
             item = "PATH"
+        else:
+            item = "LINK"
 
         items = [item, depth]
 
@@ -187,7 +185,7 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
             print(f"{prefix}- {SPACING_STYLE.join(quoted[2:])}")
 
 
-if args.json and result_list:
+if args.json:
     import json
 
     json.dump(result_list, sys.stdout)

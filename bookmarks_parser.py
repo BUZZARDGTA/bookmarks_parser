@@ -155,10 +155,10 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
             item = "HR"
         elif html_folder:
             item = "FOLDER"
-        elif args.folders_path:
-            item = "PATH"
+        elif html_link:
+            item = "PATH" if args.folders_path else "LINK"
         else:
-            item = "LINK"
+            assert False, "All possible items exhausted"
 
         items = [item, depth]
 

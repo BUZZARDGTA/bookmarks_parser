@@ -10,7 +10,6 @@ group_folders_matching = parser.add_mutually_exclusive_group()
 
 parser.add_argument('bookmarks_file', metavar='<bookmarks file>',
     help='the path of the bookmark file')
-parser.add_argument('-j', '--json', action='store_true', help='output in JSON format')
 parser.add_argument('-folders', '--list-folders', action='store_true', default=False,
     help='list the folders (default)')
 parser.add_argument('-links', '--list-links', action='store_true', default=False,
@@ -23,6 +22,8 @@ parser.add_argument('-i', '--list-index', action='store_true', default=False,
     help='list the index numbers')
 parser.add_argument('-e', '--extended-parsing', action='store_true', default=False,
     help='alternative display easily manipulable for developers')
+parser.add_argument('-j', '--json', action='store_true', default=False,
+    help='output in JSON format')
 group_folders_displaying.add_argument('--folders-name', action='store_true', default=False,
     help='display the folders name (default)')
 group_folders_displaying.add_argument('--folders-path', action='store_true', default=False,
@@ -48,7 +49,7 @@ if not (args.list_folders or args.list_links or args.list_hr):
     args.list_folders = True
     args.list_links = True
     args.list_hr = True
-if not str(args.depth) == "False":
+if not args.depth == False:
     args.depth = int(args.depth)
 SPACING_STYLE = args.spacing_style
 if not SPACING_STYLE in [' ', ",", "-", "_"]:
@@ -57,7 +58,7 @@ QUOTING_STYLE = args.quoting_style
 if not QUOTING_STYLE in ['"', "'", ""]:
     QUOTING_STYLE = '"'
 
-HTML_FOLDER_RE = re.compile(r'(?P<link>)<DT><H3 [^>]*>(?P<name>[^<]*)</H3>', re.IGNORECASE)
+HTML_FOLDER_RE = re.compile(r'<DT><H3 [^>]*>(?P<name>[^<]*)</H3>', re.IGNORECASE)
 HTML_LINK_RE = re.compile(r'<DT><A HREF="(?P<link>https?:[^"]+)"[^>]*>(?P<name>[^<]*)</A>', re.IGNORECASE)
 
 sys.stdin.reconfigure(encoding="utf-8")
@@ -68,7 +69,7 @@ link = name = ""
 list_path = []
 path = []
 depth_scan = html_open_dl_p = html_closed_dl_p = previous_line_open_dl_p = False
-regexes = r'(?P<html_hr><HR>)', r'(?P<html_link><DT><A HREF="https?:[^"]+"[^>]*>[^<]*</A>)', r'(?P<html_folder><DT><H3 [^>]*>[^<]*</H3>)', r'(?P<html_open_dl_p><DL><p>)', r'(?P<html_closed_dl_p></DL><p>)'
+regexes = r'(?P<html_open_dl_p><DL><p>)', r'(?P<html_hr><HR>)', r'(?P<html_folder><DT><H3 [^>]*>[^<]*</H3>)', r'(?P<html_link><DT><A HREF="https?:[^"]+"[^>]*>[^<]*</A>)', r'(?P<html_closed_dl_p></DL><p>)'
 combinedRegex = re.compile('|'.join(regexes), re.IGNORECASE)
 
 
@@ -83,9 +84,7 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
         previous_line_open_dl_p = html_open_dl_p
     else:
         previous_line_open_dl_p = False
-    for html_hr, html_link, html_folder, html_open_dl_p, html_closed_dl_p in combinedRegex.findall(line):
-        if html_link and html_folder:
-            continue
+    for html_open_dl_p, html_hr, html_folder, html_link, html_closed_dl_p in combinedRegex.findall(line):
 
         if html_closed_dl_p:
             if previous_line_open_dl_p:
@@ -97,21 +96,21 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
         if args.list_index:
             index += 1
 
-        if html_link:
-            match = re.search(HTML_LINK_RE, html_link)
-            assert match
-            link, name = match.group("link", "name")
+        if html_hr:
+            name = "--------------------"
         elif html_folder:
             match = re.search(HTML_FOLDER_RE, html_folder)
             assert match
             name = match["name"]
-        else:
-            name = "--------------------"
+        elif html_link:
+            match = re.search(HTML_LINK_RE, html_link)
+            assert match
+            link, name = match.group("link", "name")
 
         previous_depth = depth
         depth = ((len(line) - len(line.lstrip(" "))) // 4) - 1
 
-        if (html_link or html_folder or html_hr):
+        if (html_hr or html_folder or html_link):
             if args.folders_path:
                 if depth < previous_depth:
                     list_path = list_path[:-(previous_depth - depth)]
@@ -147,20 +146,24 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
             continue
         elif html_folder and not args.list_folders:
             continue
-        elif html_link and link and not args.list_links:
+        elif html_link and not args.list_links:
             continue
-        elif not (html_hr or html_folder or (html_link and link)):
+        elif not (html_hr or html_folder or html_link):
             continue
 
         results += 1
 
-        items = [
-            ("HR" if html_hr
-             else "LINK" if html_link
-             else "PATH" if args.folders_path
-             else "FOLDER"),
-            depth,
-        ]
+        if html_hr:
+            item = "HR"
+        elif html_folder:
+            item = "FOLDER"
+        elif html_link:
+            item = "LINK"
+        elif args.folders_path:
+            item = "PATH"
+
+        items = [item, depth]
+
         if args.list_results:
             items.append(results)
         if args.list_index:
@@ -175,10 +178,7 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
             result_list.append(items)
             continue
 
-        if html_hr:
-            quoted = [*map(quote, items[:-1]), name]
-        else:
-            quoted = list(map(quote, items))
+        quoted = list(map(quote, items))
 
         if args.extended_parsing:
             print(f"{SPACING_STYLE}".join(quoted))
@@ -186,7 +186,8 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
             prefix = "-" * depth if html_folder else " " * (depth + 1)
             print(f"{prefix}- {SPACING_STYLE.join(quoted[2:])}")
 
-if args.json:
-    import json
 
-    json.dump(result_list, sys.stdout)
+if args.json and result_list:
+        import json
+
+        json.dump(result_list, sys.stdout)

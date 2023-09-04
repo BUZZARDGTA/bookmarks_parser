@@ -1,7 +1,6 @@
 import argparse
-import sys
 import re
-
+import sys
 
 parser = argparse.ArgumentParser(description='Parse a HTML bookmark file.')
 
@@ -22,6 +21,8 @@ parser.add_argument('-i', '--list-index', action='store_true', default=False,
     help='list the index numbers')
 parser.add_argument('-e', '--extended-parsing', action='store_true', default=False,
     help='alternative display easily manipulable for developers')
+parser.add_argument('-j', '--json', action='store_true', default=False,
+    help='output in JSON format')
 group_folders_displaying.add_argument('--folders-name', action='store_true', default=False,
     help='display the folders name (default)')
 group_folders_displaying.add_argument('--folders-path', action='store_true', default=False,
@@ -47,7 +48,7 @@ if not (args.list_folders or args.list_links or args.list_hr):
     args.list_folders = True
     args.list_links = True
     args.list_hr = True
-if not str(args.depth) == "False":
+if args.depth is not False:
     args.depth = int(args.depth)
 SPACING_STYLE = args.spacing_style
 if not SPACING_STYLE in [' ', ",", "-", "_"]:
@@ -56,6 +57,8 @@ QUOTING_STYLE = args.quoting_style
 if not QUOTING_STYLE in ['"', "'", ""]:
     QUOTING_STYLE = '"'
 
+HTML_FOLDER_RE = re.compile(r'<DT><H3 [^>]*>(?P<name>[^<]*)</H3>', re.IGNORECASE)
+HTML_LINK_RE = re.compile(r'<DT><A HREF="(?P<link>https?:[^"]+)"[^>]*>(?P<name>[^<]*)</A>', re.IGNORECASE)
 
 sys.stdin.reconfigure(encoding="utf-8")
 sys.stdout.reconfigure(encoding="utf-8")
@@ -65,27 +68,22 @@ link = name = ""
 list_path = []
 path = []
 depth_scan = html_open_dl_p = html_closed_dl_p = previous_line_open_dl_p = False
-regexes = r'(?P<html_hr><HR>)', r'(?P<html_link><DT><A HREF="https?:[^"]+"[^>]*>[^<]*</A>)', r'(?P<html_folder><DT><H3 [^>]*>[^<]*</H3>)', r'(?P<html_open_dl_p><DL><p>)', r'(?P<html_closed_dl_p></DL><p>)'
-combinedRegex = re.compile('|'.join('(?:{0})'.format(x) for x in regexes), re.IGNORECASE)
+regexes = r'(?P<html_open_dl_p><DL><p>)', r'(?P<html_hr><HR>)', r'(?P<html_folder><DT><H3 [^>]*>[^<]*</H3>)', r'(?P<html_link><DT><A HREF="https?:[^"]+"[^>]*>[^<]*</A>)', r'(?P<html_closed_dl_p></DL><p>)'
+combinedRegex = re.compile('|'.join(regexes), re.IGNORECASE)
 
 
-def stdout(list_stdout):
-    if args.extended_parsing:
-        print(f"{SPACING_STYLE}".join(list_stdout).replace('"', f'{QUOTING_STYLE}'))
-    else:
-        print(f"{list_stdout[0]} " + f"{SPACING_STYLE}".join(list_stdout[1:]).replace('"', f'{QUOTING_STYLE}'))
+def quote(item):
+    return f"{QUOTING_STYLE}{item}{QUOTING_STYLE}"
 
+
+result_list = []
 
 for line in open(args.bookmarks_file, "r", encoding="utf-8"):
     if html_open_dl_p:
         previous_line_open_dl_p = html_open_dl_p
     else:
         previous_line_open_dl_p = False
-    for html_hr, html_link, html_folder, html_open_dl_p, html_closed_dl_p in combinedRegex.findall(line):
-        if html_link:
-            if html_folder:
-                continue
-
+    for html_open_dl_p, html_hr, html_folder, html_link, html_closed_dl_p in combinedRegex.findall(line):
         if html_closed_dl_p:
             if previous_line_open_dl_p:
                 list_path = list_path[:-1]
@@ -96,20 +94,21 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
         if args.list_index:
             index += 1
 
-        if html_link:
-            regex = re.compile(r'<DT><A HREF="(?P<link>https?:[^"]+)"[^>]*>(?P<name>[^<]*)</A>', re.IGNORECASE)
-            match = re.search(regex, html_link)
-            link = match["link"]
-            name = match["name"]
+        if html_hr:
+            name = "--------------------"
         elif html_folder:
-            regex = re.compile(r'<DT><H3 [^>]*>(?P<name>[^<]*)</H3>', re.IGNORECASE)
-            match = re.search(regex, html_folder)
+            match = re.search(HTML_FOLDER_RE, html_folder)
+            assert match
             name = match["name"]
+        elif html_link:
+            match = re.search(HTML_LINK_RE, html_link)
+            assert match
+            link, name = match.group("link", "name")
 
         previous_depth = depth
         depth = ((len(line) - len(line.lstrip(" "))) // 4) - 1
 
-        if (html_link or html_folder or html_hr):
+        if (html_hr or html_folder or html_link):
             if args.folders_path:
                 if depth < previous_depth:
                     list_path = list_path[:-(previous_depth - depth)]
@@ -120,7 +119,7 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
                 else:
                     path = "".join(list_path)[:-1]
 
-        if not str(args.depth) == "False":
+        if args.depth is not False:
             if not depth == args.depth:
                 continue
 
@@ -131,7 +130,7 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
                 continue
 
         if args.folders_all_case_sensitive or args.folders_all_case_insensitive:
-            if str(depth_scan) == "False":
+            if depth_scan is False:
                 if html_folder and ((args.folders_all_case_insensitive and name.lower() == args.folders_all_case_insensitive.lower()) or
                                     (not args.folders_all_case_insensitive and name == args.folders_all_case_sensitive)):
                     depth_scan = depth
@@ -141,70 +140,52 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
                 depth_scan = False
                 continue
 
+        if html_hr and not args.list_hr:
+            continue
+        elif html_folder and not args.list_folders:
+            continue
+        elif html_link and not args.list_links:
+            continue
+        elif not (html_hr or html_folder or html_link):
+            continue
+
+        results += 1
+
         if html_hr:
-            if args.list_hr:
-                list_stdout = []
-                if args.extended_parsing:
-                    list_stdout.append('"HR"')
-                else:
-                    prefix = " " * (depth)
-                    list_stdout.append(f"{prefix} -")
-                if args.extended_parsing:
-                    list_stdout.append(f'"{depth}"')
-                if args.list_results:
-                    results += 1
-                    list_stdout.append(f'"{results}"')
-                if args.list_index:
-                    list_stdout.append(f'"{index}"')
-                if args.folders_path:
-                    list_stdout.append(f'"{path}"')
-                list_stdout.append(f"--------------------")
-                stdout(list_stdout)
-                continue
-
-        if html_link:
-            if link:
-                if args.list_links:
-                    list_stdout = []
-                    if args.extended_parsing:
-                        list_stdout.append('"LINK"')
-                    else:
-                        prefix = " " * (depth)
-                        list_stdout.append(f"{prefix} -")
-                    if args.extended_parsing:
-                        list_stdout.append(f'"{depth}"')
-                    if args.list_results:
-                        results += 1
-                        list_stdout.append(f'"{results}"')
-                    if args.list_index:
-                        list_stdout.append(f'"{index}"')
-                    if args.folders_path:
-                        list_stdout.append(f'"{path}"')
-                    list_stdout.extend((f'"{link}"', f'"{name}"'))
-                    stdout(list_stdout)
-                    continue
-
+            item = "HR"
         elif html_folder:
-            if args.list_folders:
-                list_stdout = []
-                if args.extended_parsing:
-                    if args.folders_path:
-                        list_stdout.append('"PATH"')
-                    else:
-                        list_stdout.append('"FOLDER"')
-                else:
-                    prefix = "-" * (depth + 1)
-                    list_stdout.append(f"{prefix}")
-                if args.extended_parsing:
-                    list_stdout.append(f'"{depth}"')
-                if args.list_results:
-                    results += 1
-                    list_stdout.append(f'"{results}"')
-                if args.list_index:
-                    list_stdout.append(f'"{index}"')
-                if args.folders_path:
-                    list_stdout.extend((f'"{path}"', f'"{name}"'))
-                else:
-                    list_stdout.append(f'"{name}"')
-                stdout(list_stdout)
-                continue
+            item = "FOLDER" if not args.folders_path else "PATH"
+        elif html_link:
+            item = "LINK"
+        else:
+            assert False, "All possible items exhausted"
+
+        items = [item, depth]
+
+        if args.list_results:
+            items.append(results)
+        if args.list_index:
+            items.append(index)
+        if args.folders_path:
+            items.append(path)
+        if html_link:
+            items.append(link)
+        items.append(name)
+
+        if args.json:
+            result_list.append(items)
+            continue
+
+        quoted = list(map(quote, items))
+
+        if args.extended_parsing:
+            print(f"{SPACING_STYLE}".join(quoted))
+        else:
+            prefix = "-" * depth if html_folder else " " * (depth + 1)
+            print(f"{prefix}- {SPACING_STYLE.join(quoted[2:])}")
+
+
+if args.json:
+    import json
+
+    json.dump(result_list, sys.stdout)

@@ -97,11 +97,11 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
         if html_hr:
             name = "--------------------"
         elif html_folder:
-            match = re.search(HTML_FOLDER_RE, html_folder)
+            match = HTML_FOLDER_RE.search(html_folder)
             assert match
             name = match["name"]
         elif html_link:
-            match = re.search(HTML_LINK_RE, html_link)
+            match = HTML_LINK_RE.search(html_link)
             assert match
             link, name = match.group("link", "name")
 

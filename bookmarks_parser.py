@@ -50,6 +50,8 @@ if not (args.list_folders or args.list_links or args.list_hr):
     args.list_hr = True
 if args.depth is not False:
     args.depth = int(args.depth)
+    if args.depth < 0:
+        raise ValueError("Depth must be a positive number or zero.")
 SPACING_STYLE = args.spacing_style
 if not SPACING_STYLE in [' ', ",", "-", "_"]:
     SPACING_STYLE = ' '
@@ -136,7 +138,9 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
 
         if args.folders_all_case_sensitive or args.folders_all_case_insensitive:
             if depth_scan is False:
-                if html_folder and (
+                if not html_folder:
+                    continue
+                if (
                     (args.folders_all_case_sensitive and (name == args.folders_all_case_sensitive)) or
                     (args.folders_all_case_insensitive and (name.lower() == args.folders_all_case_insensitive.lower()))
                 ):

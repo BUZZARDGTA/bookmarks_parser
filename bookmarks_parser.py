@@ -57,6 +57,7 @@ QUOTING_STYLE = args.quoting_style
 if not QUOTING_STYLE in ['"', "'", ""]:
     QUOTING_STYLE = '"'
 
+HTML_PATTERNS_RE = r'(?P<html_open_dl_p><DL><p>)', r'(?P<html_hr><HR>)', r'(?P<html_folder><DT><H3 [^>]*>[^<]*</H3>)', r'(?P<html_link><DT><A HREF="https?:[^"]+"[^>]*>[^<]*</A>)', r'(?P<html_closed_dl_p></DL><p>)'
 HTML_FOLDER_RE = re.compile(r'<DT><H3 [^>]*>(?P<name>[^<]*)</H3>', re.IGNORECASE)
 HTML_LINK_RE = re.compile(r'<DT><A HREF="(?P<link>https?:[^"]+)"[^>]*>(?P<name>[^<]*)</A>', re.IGNORECASE)
 
@@ -67,22 +68,23 @@ depth = previous_depth = results = index = 0
 link = name = ""
 list_path = []
 path = []
+if args.json:
+    result_list = []
 depth_scan = html_open_dl_p = html_closed_dl_p = previous_line_open_dl_p = False
-regexes = r'(?P<html_open_dl_p><DL><p>)', r'(?P<html_hr><HR>)', r'(?P<html_folder><DT><H3 [^>]*>[^<]*</H3>)', r'(?P<html_link><DT><A HREF="https?:[^"]+"[^>]*>[^<]*</A>)', r'(?P<html_closed_dl_p></DL><p>)'
-combinedRegex = re.compile('|'.join(regexes), re.IGNORECASE)
 
 
 def quote(item):
     return f"{QUOTING_STYLE}{item}{QUOTING_STYLE}"
 
 
-result_list = []
+combinedRegex = re.compile('|'.join(HTML_PATTERNS_RE), re.IGNORECASE)
 
 for line in open(args.bookmarks_file, "r", encoding="utf-8"):
     if html_open_dl_p:
         previous_line_open_dl_p = html_open_dl_p
     else:
         previous_line_open_dl_p = False
+
     for html_open_dl_p, html_hr, html_folder, html_link, html_closed_dl_p in combinedRegex.findall(line):
         if html_closed_dl_p:
             if previous_line_open_dl_p:
@@ -126,13 +128,18 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
         if args.folders_case_sensitive or args.folders_case_insensitive:
             if not html_folder:
                 continue
-            if (args.folders_case_sensitive and name != args.folders_case_sensitive) or (args.folders_case_insensitive and name.lower() != args.folders_case_insensitive.lower()):
+            if (
+                (args.folders_case_sensitive and (name != args.folders_case_sensitive)) or
+                (args.folders_case_insensitive and (name.lower() != args.folders_case_insensitive.lower()))
+            ):
                 continue
 
         if args.folders_all_case_sensitive or args.folders_all_case_insensitive:
             if depth_scan is False:
-                if html_folder and ((args.folders_all_case_insensitive and name.lower() == args.folders_all_case_insensitive.lower()) or
-                                    (not args.folders_all_case_insensitive and name == args.folders_all_case_sensitive)):
+                if html_folder and (
+                    (args.folders_all_case_sensitive and (name == args.folders_all_case_sensitive)) or
+                    (args.folders_all_case_insensitive and (name.lower() == args.folders_all_case_insensitive.lower()))
+                ):
                     depth_scan = depth
                 else:
                     continue

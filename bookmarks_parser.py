@@ -125,7 +125,8 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
 
         if args.depth is not False:
             if not depth == args.depth:
-                continue
+                if not (args.folders_all_case_sensitive or args.folders_all_case_insensitive):
+                    continue
 
         if (args.folders_case_sensitive or args.folders_case_insensitive):
             if not html_folder:
@@ -139,6 +140,9 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
             if depth_scan is False:
                 if not html_folder:
                     continue
+                if args.depth is not False:
+                    if not depth == args.depth:
+                        continue
                 if (
                     (args.folders_all_case_sensitive and (name == args.folders_all_case_sensitive)) or
                     (args.folders_all_case_insensitive and (name.lower() == args.folders_all_case_insensitive.lower()))

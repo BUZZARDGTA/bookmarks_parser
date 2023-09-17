@@ -66,13 +66,14 @@ HTML_LINK_RE = re.compile(r'<DT><A HREF="(?P<link>https?:[^"]+)"[^>]*>(?P<name>[
 sys.stdin.reconfigure(encoding="utf-8")
 sys.stdout.reconfigure(encoding="utf-8")
 
-depth = previous_depth = results = index = 0
+depth = -1
+previous_depth = results = index = 0
 link = name = ""
 list_path = []
 path = []
 if args.json:
     result_list = []
-depth_scan = html_open_dl_p = html_closed_dl_p = previous_line_open_dl_p = False
+depth_scan = html_open_dl_p = html_closed_dl_p = previous_line__is__html_open_dl_p = False
 
 
 def quote(item):
@@ -82,19 +83,14 @@ def quote(item):
 combinedRegex = re.compile('|'.join(HTML_PATTERNS_RE), re.IGNORECASE)
 
 for line in open(args.bookmarks_file, "r", encoding="utf-8"):
-    if html_open_dl_p:
-        previous_line_open_dl_p = html_open_dl_p
-    else:
-        previous_line_open_dl_p = False
 
     for html_open_dl_p, html_hr, html_folder, html_link, html_closed_dl_p in combinedRegex.findall(line):
-        if html_closed_dl_p:
-            if previous_line_open_dl_p:
-                list_path = list_path[:-1]
+        if html_open_dl_p:
+            depth += 1
             continue
-        elif html_open_dl_p:
+        elif html_closed_dl_p:
+            depth -= 1
             continue
-
         if args.list_index:
             index += 1
 
@@ -109,19 +105,13 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
             assert match
             link, name = match.group("link", "name")
 
-        previous_depth = depth
-        depth = ((len(line) - len(line.lstrip(" "))) // 4) - 1
-
-        if (html_hr or html_folder or html_link):
-            if args.folders_path:
-                if depth < previous_depth:
-                    list_path = list_path[:-(previous_depth - depth)]
-                if html_folder:
-                    list_path.append(name.replace("\\", "\\\\").replace("/", "\\/") + "/")
-                    if args.extended_parsing:
-                        path = "".join(list_path[:-1])[:-1]
-                else:
-                    path = "".join(list_path)[:-1]
+        if args.folders_path:
+            list_path = list_path[:depth]
+            if html_folder:
+                list_path.append(name.replace("\\", "\\\\").replace("/", "\\/") + "/")
+                path = "".join(list_path[:-1])[:-1] # Removes the folder from the PATH because it displays it as a new folder  # Removes the trailing [+ "/"] from above
+            else:
+                path = "".join(list_path)[:-1] # Removes the trailing [+ "/"] from above
 
         if args.depth is not False:
             if not depth == args.depth:
@@ -154,13 +144,11 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
                 depth_scan = False
                 continue
 
-        if html_hr and not args.list_hr:
+        if (html_hr and not args.list_hr):
             continue
-        elif html_folder and not args.list_folders:
+        elif (html_folder and not args.list_folders):
             continue
-        elif html_link and not args.list_links:
-            continue
-        elif not (html_hr or html_folder or html_link):
+        elif (html_link and not args.list_links):
             continue
 
         results += 1

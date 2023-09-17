@@ -195,7 +195,7 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
         if args.extended_parsing:
             print(f"{SPACING_STYLE}".join(quoted))
         else:
-            prefix = "-" * depth if html_folder else " " * (depth + 1)
+            prefix = "-" * depth if html_folder else " " * depth
             print(f"{prefix}- {SPACING_STYLE.join(quoted[2:])}")
 
 

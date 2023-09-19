@@ -59,7 +59,14 @@ QUOTING_STYLE = args.quoting_style
 if not QUOTING_STYLE in ['"', "'", ""]:
     QUOTING_STYLE = '"'
 
-HTML_PATTERNS_RE = r'(?P<html_open_dl_p><DL><p>)', r'(?P<html_hr><HR>)', r'(?P<html_folder><DT><H3 [^>]*>[^<]*</H3>)', r'(?P<html_link><DT><A HREF="https?:[^"]+"[^>]*>[^<]*</A>)', r'(?P<html_closed_dl_p></DL><p>)'
+regexes = (
+    r'(?P<html_open_dl_p><DL><p>)',
+    r'(?P<html_hr><HR>)',
+    r'(?P<html_folder><DT><H3 [^>]*>[^<]*</H3>)',
+    r'(?P<html_link><DT><A HREF="https?:[^"]+"[^>]*>[^<]*</A>)',
+    r'(?P<html_closed_dl_p></DL><p>)'
+)
+HTML_PATTERNS_RE = re.compile('|'.join(regexes), re.IGNORECASE)
 HTML_FOLDER_RE = re.compile(r'<DT><H3 [^>]*>(?P<name>[^<]*)</H3>', re.IGNORECASE)
 HTML_LINK_RE = re.compile(r'<DT><A HREF="(?P<link>https?:[^"]+)"[^>]*>(?P<name>[^<]*)</A>', re.IGNORECASE)
 
@@ -80,11 +87,9 @@ def quote(item):
     return f"{QUOTING_STYLE}{item}{QUOTING_STYLE}"
 
 
-combinedRegex = re.compile('|'.join(HTML_PATTERNS_RE), re.IGNORECASE)
-
 for line in open(args.bookmarks_file, "r", encoding="utf-8"):
 
-    for html_open_dl_p, html_hr, html_folder, html_link, html_closed_dl_p in combinedRegex.findall(line):
+    for html_open_dl_p, html_hr, html_folder, html_link, html_closed_dl_p in HTML_PATTERNS_RE.findall(line):
         if html_open_dl_p:
             depth += 1
             continue

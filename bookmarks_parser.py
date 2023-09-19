@@ -4,10 +4,23 @@ import sys
 
 parser = argparse.ArgumentParser(description='Parse a HTML bookmark file.')
 
+def callback_argparse__is_positive_int(value):
+    try:
+        int_value = int(value)
+        if int_value >= 0:
+            return int_value
+        else:
+            raise ValueError
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"invalid positive int value: '{value}'")
+
 group_folders_displaying = parser.add_mutually_exclusive_group()
 group_folders_matching = parser.add_mutually_exclusive_group()
 
-parser.add_argument('bookmarks_file', metavar='<bookmarks file>',
+valid_spacing_characters = [' ', ',', '-', '_', '|']
+valid_quoting_characters = ['"', "'", ""]
+
+parser.add_argument('bookmarks_file', metavar='<bookmarks file>', type=str,
     help='the path of the bookmark file')
 parser.add_argument('-folders', '--list-folders', action='store_true', default=False,
     help='list the folders (default)')
@@ -27,20 +40,20 @@ group_folders_displaying.add_argument('--folders-name', action='store_true', def
     help='display the folders name (default)')
 group_folders_displaying.add_argument('--folders-path', action='store_true', default=False,
     help='display the folders path')
-group_folders_matching.add_argument('--folders-case_sensitive', metavar='<folder name>', default=False,
+group_folders_matching.add_argument('--folders-case_sensitive', metavar='<folder name>', default=False, type=str,
     help='list all folders matching <folder name> with case sensitive.')
-group_folders_matching.add_argument('--folders-case_insensitive', metavar='<folder name>', default=False,
+group_folders_matching.add_argument('--folders-case_insensitive', metavar='<folder name>', default=False, type=str,
     help='list all folders matching <folder name> with case insensitive.')
-group_folders_matching.add_argument('--folders-all-case_sensitive', metavar='<folder name>', default=False,
+group_folders_matching.add_argument('--folders-all-case_sensitive', metavar='<folder name>', default=False, type=str,
     help='list all content from folders matching <folder name> with case sensitive.')
-group_folders_matching.add_argument('--folders-all-case_insensitive', metavar='<folder name>', default=False,
+group_folders_matching.add_argument('--folders-all-case_insensitive', metavar='<folder name>', default=False, type=str,
     help='list all content from folders matching <folder name> with case insensitive.')
-parser.add_argument('--depth', metavar='<depth>', default=False,
-    help='list the choosen depth only')
-parser.add_argument('--spacing-style', metavar='<character>', default=False,
-    help='Change the spacing style <character>. Valid characters are: [ ]/[,]/[-]/[_]  (default: [ ])')
-parser.add_argument('--quoting-style', metavar='<character>', default=False,
-    help='Change the quoting style <character>. Valid characters are: ["]/[\'].  (default: ["])')
+parser.add_argument('--depth', metavar='<depth>', default=False, type=callback_argparse__is_positive_int,
+    help='list all content within matching depth <depth>. It must be a positive number or zero. (default: -1)')
+parser.add_argument('--spacing-style', metavar='<character>', default=" ", choices=valid_spacing_characters, type=str,
+    help=f"Change the spacing style <character>. Valid characters are: {valid_spacing_characters} (default: ' ')")
+parser.add_argument('--quoting-style', metavar='<character>', default='"', choices=valid_quoting_characters, type=str,
+    help=f"Change the quoting style <character>. Valid characters are: {valid_quoting_characters} (default: '\"')")
 
 args = parser.parse_args()
 
@@ -48,16 +61,6 @@ if not (args.list_folders or args.list_links or args.list_hr):
     args.list_folders = True
     args.list_links = True
     args.list_hr = True
-if args.depth is not False:
-    args.depth = int(args.depth)
-    if args.depth < 0:
-        raise ValueError("Depth must be a positive number or zero.")
-SPACING_STYLE = args.spacing_style
-if not SPACING_STYLE in [' ', ",", "-", "_"]:
-    SPACING_STYLE = ' '
-QUOTING_STYLE = args.quoting_style
-if not QUOTING_STYLE in ['"', "'", ""]:
-    QUOTING_STYLE = '"'
 
 sys.stdin.reconfigure(encoding="utf-8")
 sys.stdout.reconfigure(encoding="utf-8")
@@ -82,7 +85,7 @@ depth_scan = html_open_dl_p = html_closed_dl_p = previous_line__is__html_open_dl
 
 
 def quote(item):
-    return f"{QUOTING_STYLE}{item}{QUOTING_STYLE}"
+    return f"{args.quoting_style}{item}{args.quoting_style}"
 
 
 for line in open(args.bookmarks_file, "r", encoding="utf-8"):
@@ -180,10 +183,10 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
         quoted = list(map(quote, items))
 
         if args.extended_parsing:
-            print(f"{SPACING_STYLE}".join(quoted))
+            print(args.spacing_style.join(quoted))
         else:
             prefix = "-" * depth if html_folder else " " * depth
-            print(f"{prefix}- {SPACING_STYLE.join(quoted[2:])}")
+            print(f"{prefix}- {args.spacing_style.join(quoted[2:])}")
 
 
 if args.json:

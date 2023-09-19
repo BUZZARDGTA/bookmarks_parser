@@ -63,12 +63,12 @@ regexes = (
     r'(?P<html_open_dl_p><DL><p>)',
     r'(?P<html_hr><HR>)',
     r'(?P<html_folder><DT><H3 [^>]*>[^<]*</H3>)',
-    r'(?P<html_link><DT><A HREF="https?:[^"]+"[^>]*>[^<]*</A>)',
+    r'(?P<html_link><DT><A HREF=".*?://[^"]+"[^>]*>[^<]*</A>)',
     r'(?P<html_closed_dl_p></DL><p>)'
 )
 HTML_PATTERNS_RE = re.compile('|'.join(regexes), re.IGNORECASE)
 HTML_FOLDER_RE = re.compile(r'<DT><H3 [^>]*>(?P<name>[^<]*)</H3>', re.IGNORECASE)
-HTML_LINK_RE = re.compile(r'<DT><A HREF="(?P<link>https?:[^"]+)"[^>]*>(?P<name>[^<]*)</A>', re.IGNORECASE)
+HTML_LINK_RE = re.compile(r'<DT><A HREF="(?P<link>.*?://[^"]+)"[^>]*>(?P<name>[^<]*)</A>', re.IGNORECASE)
 
 sys.stdin.reconfigure(encoding="utf-8")
 sys.stdout.reconfigure(encoding="utf-8")

@@ -59,19 +59,17 @@ QUOTING_STYLE = args.quoting_style
 if not QUOTING_STYLE in ['"', "'", ""]:
     QUOTING_STYLE = '"'
 
+sys.stdin.reconfigure(encoding="utf-8")
+sys.stdout.reconfigure(encoding="utf-8")
+
 regexes = (
     r'(?P<html_open_dl_p><DL><p>)',
     r'(?P<html_hr><HR>)',
-    r'(?P<html_folder><DT><H3 [^>]*>[^<]*</H3>)',
-    r'(?P<html_link><DT><A HREF=".*?://[^"]+"[^>]*>[^<]*</A>)',
+    r'(?P<html_folder><DT><H3 [^>]*>(?P<folder_name>[^<]*)</H3>)',
+    r'(?P<html_link><DT><A HREF=".*?://(?P<link>[^"]+)[^>]*>(?P<link_name>[^<]*)</A>)',
     r'(?P<html_closed_dl_p></DL><p>)'
 )
 HTML_PATTERNS_RE = re.compile('|'.join(regexes), re.IGNORECASE)
-HTML_FOLDER_RE = re.compile(r'<DT><H3 [^>]*>(?P<name>[^<]*)</H3>', re.IGNORECASE)
-HTML_LINK_RE = re.compile(r'<DT><A HREF="(?P<link>.*?://[^"]+)"[^>]*>(?P<name>[^<]*)</A>', re.IGNORECASE)
-
-sys.stdin.reconfigure(encoding="utf-8")
-sys.stdout.reconfigure(encoding="utf-8")
 
 depth = -1
 previous_depth = results = index = 0
@@ -89,7 +87,7 @@ def quote(item):
 
 for line in open(args.bookmarks_file, "r", encoding="utf-8"):
 
-    for html_open_dl_p, html_hr, html_folder, html_link, html_closed_dl_p in HTML_PATTERNS_RE.findall(line):
+    for html_open_dl_p, html_hr, html_folder, folder_name, html_link, link, link_name, html_closed_dl_p in HTML_PATTERNS_RE.findall(line):
         if html_open_dl_p:
             depth += 1
             continue
@@ -102,13 +100,9 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
         if html_hr:
             name = "--------------------"
         elif html_folder:
-            match = HTML_FOLDER_RE.search(html_folder)
-            assert match
-            name = match["name"]
+            name = folder_name
         elif html_link:
-            match = HTML_LINK_RE.search(html_link)
-            assert match
-            link, name = match.group("link", "name")
+            name = link_name
 
         if args.folders_path:
             list_path = list_path[:depth]

@@ -28,10 +28,10 @@ parser.add_argument('-links', '--list-links', action='store_true', default=False
     help='list the links (default)')
 parser.add_argument('-hr', '--list-hr', action='store_true', default=False,
     help='list the hr elements (default)')
-parser.add_argument('-r', '--list-results', action='store_true', default=False,
-    help='list the results numbers')
 parser.add_argument('-i', '--list-index', action='store_true', default=False,
     help='list the index numbers')
+parser.add_argument('-r', '--list-results', action='store_true', default=False,
+    help='list the results numbers')
 parser.add_argument('-e', '--extended-parsing', action='store_true', default=False,
     help='alternative display easily manipulable for developers')
 parser.add_argument('-j', '--json', action='store_true', default=False,
@@ -40,16 +40,18 @@ group_folders_displaying.add_argument('--folders-name', action='store_true', def
     help='display the folders name (default)')
 group_folders_displaying.add_argument('--folders-path', action='store_true', default=False,
     help='display the folders path')
-group_folders_matching.add_argument('--folders-case_sensitive', metavar='<folder name>', default=False, type=str,
-    help='list all folders matching <folder name> with case sensitive.')
-group_folders_matching.add_argument('--folders-case_insensitive', metavar='<folder name>', default=False, type=str,
-    help='list all folders matching <folder name> with case insensitive.')
-group_folders_matching.add_argument('--folders-all-case_sensitive', metavar='<folder name>', default=False, type=str,
-    help='list all content from folders matching <folder name> with case sensitive.')
-group_folders_matching.add_argument('--folders-all-case_insensitive', metavar='<folder name>', default=False, type=str,
-    help='list all content from folders matching <folder name> with case insensitive.')
 parser.add_argument('--depth', metavar='<depth>', default=False, type=callback_argparse__is_positive_int,
-    help='list all content within matching depth <depth>. It must be a positive number or zero. (default: -1)')
+    help='List all content within matching depth <depth>. It must be a positive number or zero. (default: -1)')
+group_folders_matching.add_argument('--folders-case_sensitive', metavar='<folder name>', default=False, type=str,
+    help='List all folders matching <folder name> with case sensitive.')
+group_folders_matching.add_argument('--folders-case_insensitive', metavar='<folder name>', default=False, type=str,
+    help='List all folders matching <folder name> with case insensitive.')
+group_folders_matching.add_argument('--folders-all-case_sensitive', metavar='<folder name>', default=False, type=str,
+    help='List all content from folders matching <folder name> with case sensitive.')
+group_folders_matching.add_argument('--folders-all-case_insensitive', metavar='<folder name>', default=False, type=str,
+    help='List all content from folders matching <folder name> with case insensitive.')
+parser.add_argument('--export-personal_toolbar_folder', action='store_true', default=False,
+    help='Exports the default bookmarks toolbar folder.')
 parser.add_argument('--spacing-style', metavar='<character>', default=" ", choices=valid_spacing_characters, type=str,
     help=f"Change the spacing style <character>. Valid characters are: {valid_spacing_characters} (default: ' ')")
 parser.add_argument('--quoting-style', metavar='<character>', default='"', choices=valid_quoting_characters, type=str,
@@ -68,7 +70,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 regexes = (
     r'(?P<html_open_dl_p><DL><p>)',
     r'(?P<html_hr><HR>)',
-    r'(?P<html_folder><DT><H3 [^>]*>(?P<folder_name>[^<]*)</H3>)',
+    r'(?P<html_folder><DT><H3 [^>]*?(?P<personal_toolbar_folder>PERSONAL_TOOLBAR_FOLDER=\"true\")?>(?P<folder_name>[^<]*)</H3>)',
     r'(?P<html_link><DT><A HREF=".*?://(?P<link>[^"]+)[^>]*>(?P<link_name>[^<]*)</A>)',
     r'(?P<html_closed_dl_p></DL><p>)'
 )
@@ -90,7 +92,7 @@ def quote(item):
 
 for line in open(args.bookmarks_file, "r", encoding="utf-8"):
 
-    for html_open_dl_p, html_hr, html_folder, folder_name, html_link, link, link_name, html_closed_dl_p in HTML_PATTERNS_RE.findall(line):
+    for html_open_dl_p, html_hr, html_folder, personal_toolbar_folder, folder_name, html_link, link, link_name, html_closed_dl_p in HTML_PATTERNS_RE.findall(line):
         if html_open_dl_p:
             depth += 1
             continue
@@ -152,6 +154,13 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
             continue
         elif (html_link and not args.list_links):
             continue
+
+        if args.export_personal_toolbar_folder:
+            if html_folder:
+                if not personal_toolbar_folder:
+                    continue
+            else:
+                continue
 
         results += 1
 

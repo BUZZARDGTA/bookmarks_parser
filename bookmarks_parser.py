@@ -24,8 +24,28 @@ parser.add_argument('bookmarks_file', metavar='<bookmarks file>', type=str,
     help='the path of the bookmark file')
 parser.add_argument('-folders', '--list-folders', action='store_true', default=False,
     help='list the folders (default)')
+parser.add_argument('--list-folders-add_date', action='store_true', default=False,
+    help='list the "ADD_DATE" attribute within \'--list-folders\'')
+parser.add_argument('--list-folders-last_modified', action='store_true', default=False,
+    help='list the "LAST_MODIFIED" attribute within \'--list-folders\'')
+parser.add_argument('--list-folders-personal_toolbar_folder', action='store_true', default=False,
+    help='list the "PERSONAL_TOOLBAR_FOLDER" attribute within \'--list-folders\'')
 parser.add_argument('-links', '--list-links', action='store_true', default=False,
     help='list the links (default)')
+parser.add_argument('--no-list-links-href', action='store_true', default=False,
+    help='do not list the "HREF" attribute within \'--list-links\'')
+parser.add_argument('--list-links-add_date', action='store_true', default=False,
+    help='list the "ADD_DATE" attribute within \'--list-links\'')
+parser.add_argument('--list-links-last_modified', action='store_true', default=False,
+    help='list the "LAST_MODIFIED" attribute within \'--list-links\'')
+parser.add_argument('--list-links-icon_uri', action='store_true', default=False,
+    help='list the "ICON_URI" attribute within \'--list-links\'')
+parser.add_argument('--list-links-icon', action='store_true', default=False,
+    help='list the "ICON" attribute within \'--list-links\'')
+parser.add_argument('--list-links-shortcuturl', action='store_true', default=False,
+    help='list the "SHORTCUTURL" attribute within \'--list-links\'')
+parser.add_argument('--list-links-tags', action='store_true', default=False,
+    help='list the "TAGS" attribute within \'--list-links\'')
 parser.add_argument('-hr', '--list-hr', action='store_true', default=False,
     help='list the hr elements (default)')
 parser.add_argument('-i', '--list-index', action='store_true', default=False,
@@ -51,7 +71,7 @@ group_folders_matching.add_argument('--folders-all-case_sensitive', metavar='<fo
 group_folders_matching.add_argument('--folders-all-case_insensitive', metavar='<folder name>', default=False, type=str,
     help='List all content from folders matching <folder name> with case insensitive.')
 parser.add_argument('--export-personal_toolbar_folder', action='store_true', default=False,
-    help='Exports the default bookmarks toolbar folder.')
+    help='Exports the default bookmarks toolbar folder(s).')
 parser.add_argument('--spacing-style', metavar='<character>', default=" ", choices=valid_spacing_characters, type=str,
     help=f"Change the spacing style <character>. Valid characters are: {valid_spacing_characters} (default: ' ')")
 parser.add_argument('--quoting-style', metavar='<character>', default='"', choices=valid_quoting_characters, type=str,
@@ -70,44 +90,83 @@ sys.stdout.reconfigure(encoding="utf-8")
 regexes = (
     r'(?P<html_open_dl_p><DL><p>)',
     r'(?P<html_hr><HR>)',
-    r'(?P<html_folder><DT><H3 [^>]*?(?P<personal_toolbar_folder>PERSONAL_TOOLBAR_FOLDER=\"true\")?>(?P<folder_name>[^<]*)</H3>)',
-    r'(?P<html_link><DT><A HREF=".*?://(?P<link>[^"]+)[^>]*>(?P<link_name>[^<]*)</A>)',
+    r'(?P<html_folder><DT><H3[^>]*>(?P<folder__name>[^<]*)</H3>)',
+    r'(?P<html_link><DT><A[^>]*>(?P<link__name>[^<]*)</A>)',
     r'(?P<html_closed_dl_p></DL><p>)'
 )
-HTML_PATTERNS_RE = re.compile('|'.join(regexes), re.IGNORECASE)
+PATTERNS_HTML = re.compile('|'.join(regexes), re.IGNORECASE)
+
+# These patterns allow flexible extraction of attributes associated with bookmarks and help maintain the order of attributes, which can vary in the HTML structure.
+PATTERN_HTML__ADD_DATE = re.compile(r'ADD_DATE="(?P<add_date>[0-9]+)"', re.IGNORECASE)
+PATTERN_HTML__LAST_MODIFIED = re.compile(r'LAST_MODIFIED="(?P<last_modified>[0-9]+)"', re.IGNORECASE)
+PATTERN_HTML_FOLDER__PERSONAL_TOOLBAR_FOLDER = re.compile(r'PERSONAL_TOOLBAR_FOLDER="(?P<folder__personal_toolbar_folder>true)"', re.IGNORECASE)
+PATTERN_HTML_LINK__HREF = re.compile(r'HREF="(?P<link__href>[^"]+)"', re.IGNORECASE)
+PATTERN_HTML_LINK__ICON_URI = re.compile(r'ICON_URI="(?P<link__icon_uri>[^"]+)"', re.IGNORECASE)
+PATTERN_HTML_LINK__ICON = re.compile(r'ICON="(?P<link__icon>[^"]+)"', re.IGNORECASE)
+PATTERN_HTML_LINK__SHORTCUTURL = re.compile(r'SHORTCUTURL="(?P<link__shortcuturl>[^"]+)"', re.IGNORECASE)
+PATTERN_HTML_LINK__TAGS = re.compile(r'TAGS="(?P<link__tags>[^"]+)"', re.IGNORECASE)
 
 depth = -1
 previous_depth = results = index = 0
-link = name = ""
 list_path = []
 path = []
 if args.json:
     result_list = []
-depth_scan = html_open_dl_p = html_closed_dl_p = previous_line__is__html_open_dl_p = False
+depth_scan = False
 
 
 def quote(item):
     return f"{args.quoting_style}{item}{args.quoting_style}"
 
 
+def return_regex_match(regex: re.Pattern, content, group_match: str):
+    match = regex.search(content)
+    if match:
+        return match[group_match]
+    else:
+        return ""
+
+
 for line in open(args.bookmarks_file, "r", encoding="utf-8"):
 
-    for html_open_dl_p, html_hr, html_folder, personal_toolbar_folder, folder_name, html_link, link, link_name, html_closed_dl_p in HTML_PATTERNS_RE.findall(line):
+    for html_open_dl_p, html_hr, html_folder, folder__name, html_link, link__name, html_closed_dl_p in PATTERNS_HTML.findall(line):
         if html_open_dl_p:
             depth += 1
             continue
         elif html_closed_dl_p:
             depth -= 1
             continue
+
         if args.list_index:
             index += 1
+
 
         if html_hr:
             name = "--------------------"
         elif html_folder:
-            name = folder_name
+            name = folder__name
+            if args.list_folders_add_date:
+                folder__add_date = return_regex_match(PATTERN_HTML__ADD_DATE, html_folder, "add_date")
+            if args.list_folders_last_modified:
+                folder__last_modified = return_regex_match(PATTERN_HTML__LAST_MODIFIED, html_folder, "last_modified")
+            if args.list_folders_personal_toolbar_folder:
+                folder__personal_toolbar_folder = return_regex_match(PATTERN_HTML_FOLDER__PERSONAL_TOOLBAR_FOLDER, html_folder, "folder__personal_toolbar_folder")
         elif html_link:
-            name = link_name
+            name = link__name
+            if not args.no_list_links_href:
+                link__href = return_regex_match(PATTERN_HTML_LINK__HREF, html_link, "link__href")
+            if args.list_links_add_date:
+                link__add_date = return_regex_match(PATTERN_HTML__ADD_DATE, html_link, "add_date")
+            if args.list_links_last_modified:
+                link__last_modified = return_regex_match(PATTERN_HTML__LAST_MODIFIED, html_link, "last_modified")
+            if args.list_links_icon_uri:
+                link__icon_uri = return_regex_match(PATTERN_HTML_LINK__ICON_URI, html_link, "link__icon_uri")
+            if args.list_links_icon:
+                link__icon = return_regex_match(PATTERN_HTML_LINK__ICON, html_link, "link__icon")
+            if args.list_links_shortcuturl:
+                link__shortcuturl = return_regex_match(PATTERN_HTML_LINK__SHORTCUTURL, html_link, "link__shortcuturl")
+            if args.list_links_tags:
+                link__tags = return_regex_match(PATTERN_HTML_LINK__TAGS, html_link, "link__tags")
 
         if args.folders_path:
             list_path = list_path[:depth]
@@ -157,23 +216,28 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
 
         if args.export_personal_toolbar_folder:
             if html_folder:
-                if not personal_toolbar_folder:
+                if not folder__personal_toolbar_folder:
                     continue
             else:
                 continue
 
         results += 1
 
+        items = []
+
         if html_hr:
-            item = "HR"
+            items.append("HR")
         elif html_folder:
-            item = "FOLDER" if not args.folders_path else "PATH"
+            if args.folders_path:
+                items.append("PATH")
+            else:
+                items.append("FOLDER")
         elif html_link:
-            item = "LINK"
+            items.append("LINK")
         else:
             assert False, "All possible items exhausted"
 
-        items = [item, depth]
+        items.append(depth)
 
         if args.list_results:
             items.append(results)
@@ -182,8 +246,28 @@ for line in open(args.bookmarks_file, "r", encoding="utf-8"):
         if args.folders_path:
             items.append(path)
         if html_link:
-            items.append(link)
+            if not args.no_list_links_href:
+                items.append(link__href)
         items.append(name)
+
+        if html_folder:
+            if args.list_folders_add_date:
+                items.append(folder__add_date)
+            if args.list_folders_last_modified:
+                items.append(folder__last_modified)
+        elif html_link:
+            if args.list_links_add_date:
+                items.append(link__add_date)
+            if args.list_links_last_modified:
+                items.append(link__last_modified)
+            if args.list_links_icon_uri:
+                items.append(link__icon_uri)
+            if args.list_links_icon:
+                items.append(link__icon)
+            if args.list_links_shortcuturl:
+                items.append(link__shortcuturl)
+            if args.list_links_tags:
+                items.append(link__tags)
 
         if args.json:
             result_list.append(items)
